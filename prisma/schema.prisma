@@ -1,0 +1,720 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String              @id @default(cuid())
+  email            String              @unique
+  name             String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  address          String?
+  avatar           String?
+  isVerifiedSeller Boolean             @default(false)
+  latitude         Float?
+  longitude        Float?
+  passwordHash     String?
+  phone            String?             @unique
+  phoneVerified    Boolean             @default(false)
+  roles            Role[]              @default([USER])
+  listings         AnimalListing[]
+  animalProfiles   AnimalProfile[]
+  bookings         Booking[]
+  breederProfile   BreederProfile?
+  breedingBookings BreedingBooking[]
+  cartItems        CartItem[]
+  sentMessages     ChatMessage[]
+  chatRooms        ChatParticipant[]
+  posts            CommunityPost[]
+  appointments     DoctorAppointment[]
+  doctorProfile    DoctorProfile?
+  doctorReviews    DoctorReview[]
+  orders           Order[]
+  comments         PostComment[]
+  postLikes        PostLike[]
+  products         Product[]
+  productReviews   ProductReview[]
+  reportsSubmitted Report[]            @relation("ReporterRelation")
+  savedListings    SavedListing[]
+  transactions     Transaction[]
+  following        UserFollow[]        @relation("FollowerRelation")
+  followers        UserFollow[]        @relation("FollowingRelation")
+  subscriptions    UserSubscription[]
+  wishlist         WishlistItem[]
+}
+
+model UserFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("FollowerRelation", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowingRelation", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+model AnimalListing {
+  id              String            @id @default(cuid())
+  sellerId        String
+  title           String
+  description     String
+  category        AnimalCategory
+  breed           String
+  ageMonths       Int
+  gender          Gender            @default(MALE)
+  weight          Float?
+  healthCondition String?
+  vaccination     VaccinationStatus @default(NOT_VACCINATED)
+  milkProduction  Float?
+  price           Decimal           @db.Decimal(12, 2)
+  isNegotiable    Boolean           @default(false)
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  images          String[]
+  videos          String[]
+  isFeatured      Boolean           @default(false)
+  isPremium       Boolean           @default(false)
+  status          ListingStatus     @default(ACTIVE)
+  postedDate      DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  promotions      AdPromotion[]
+  seller          User              @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  reports         Report[]          @relation("ListingReportRelation")
+  savedBy         SavedListing[]
+
+  @@index([category])
+  @@index([sellerId])
+  @@index([status])
+  @@index([latitude, longitude])
+  @@index([createdAt(sort: Desc)])
+}
+
+model SavedListing {
+  id        String        @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime      @default(now())
+  listing   AnimalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+}
+
+model SubscriptionPlan {
+  id                String               @id @default(cuid())
+  tier              SubscriptionPlanTier @unique
+  name              String
+  price             Decimal              @db.Decimal(10, 2)
+  durationDays      Int                  @default(30)
+  listingLimit      Int
+  featuredAdLimit   Int
+  hasAnalytics      Boolean              @default(false)
+  hasSellerInsights Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  subscriptions     UserSubscription[]
+}
+
+model UserSubscription {
+  id        String           @id @default(cuid())
+  userId    String
+  planId    String
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  status    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AdPromotion {
+  id        String        @id @default(cuid())
+  listingId String
+  type      PromotionType
+  pricePaid Decimal       @db.Decimal(10, 2)
+  startDate DateTime      @default(now())
+  endDate   DateTime
+  status    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  listing   AnimalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+model DoctorProfile {
+  id                 String               @id @default(cuid())
+  userId             String               @unique
+  specialization     String
+  experienceYears    Int
+  clinicName         String?
+  clinicAddress      String?
+  latitude           Float?
+  longitude          Float?
+  degreeCertificates String[]
+  govId              String?
+  consultationFee    Decimal              @db.Decimal(10, 2)
+  isVerified         Boolean              @default(false)
+  bio                String?
+  rating             Float                @default(0.0)
+  reviewCount        Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  appointments       DoctorAppointment[]
+  availabilities     DoctorAvailability[]
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews            DoctorReview[]
+
+  @@index([latitude, longitude])
+}
+
+model DoctorAvailability {
+  id           String        @id @default(cuid())
+  doctorId     String
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  slotDuration Int           @default(30)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  doctor       DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek, startTime, endTime])
+}
+
+model DoctorAppointment {
+  id               String            @id @default(cuid())
+  userId           String
+  doctorId         String
+  dateTime         DateTime
+  timeSlot         String
+  status           AppointmentStatus @default(PENDING)
+  type             ConsultationType  @default(OFFLINE)
+  prescriptionText String?
+  prescriptionPdf  String?
+  consultationFee  Decimal           @db.Decimal(10, 2)
+  commissionPaid   Decimal           @db.Decimal(10, 2)
+  paymentStatus    PaymentStatus     @default(PENDING)
+  paymentId        String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  doctor           DoctorProfile     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review           DoctorReview?
+
+  @@index([userId])
+  @@index([doctorId])
+}
+
+model DoctorReview {
+  id            String            @id @default(cuid())
+  appointmentId String            @unique
+  userId        String
+  doctorId      String
+  rating        Int               @default(5)
+  comment       String?
+  createdAt     DateTime          @default(now())
+  appointment   DoctorAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  doctor        DoctorProfile     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  vendorId    String
+  name        String
+  description String
+  price       Decimal         @db.Decimal(10, 2)
+  stock       Int             @default(0)
+  category    ProductCategory
+  images      String[]
+  isFeatured  Boolean         @default(false)
+  rating      Float           @default(0.0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  vendor      User            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  reviews     ProductReview[]
+  wishlists   WishlistItem[]
+
+  @@index([category])
+  @@index([vendorId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  userId          String
+  totalAmount     Decimal       @db.Decimal(12, 2)
+  status          OrderStatus   @default(PENDING)
+  shippingAddress String
+  paymentId       String?
+  paymentStatus   PaymentStatus @default(PENDING)
+  couponId        String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  coupon          Coupon?       @relation(fields: [couponId], references: [id])
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Coupon {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  discountPercentage Float
+  maxDiscount        Decimal  @db.Decimal(10, 2)
+  minOrderAmount     Decimal  @db.Decimal(10, 2)
+  expiresAt          DateTime
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  orders             Order[]
+}
+
+model ProductReview {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model BreederProfile {
+  id              String            @id @default(cuid())
+  userId          String            @unique
+  businessName    String
+  experienceYears Int
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  bio             String?
+  isVerified      Boolean           @default(false)
+  rating          Float             @default(0.0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  services        BreedingService[]
+
+  @@index([latitude, longitude])
+}
+
+model BreedingService {
+  id           String            @id @default(cuid())
+  breederId    String
+  title        String
+  description  String
+  category     AnimalCategory
+  breed        String
+  price        Decimal           @db.Decimal(10, 2)
+  images       String[]
+  availability String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  bookings     BreedingBooking[]
+  breeder      BreederProfile    @relation(fields: [breederId], references: [id], onDelete: Cascade)
+
+  @@index([breederId])
+}
+
+model BreedingBooking {
+  id            String          @id @default(cuid())
+  userId        String
+  serviceId     String
+  status        BookingStatus   @default(PENDING)
+  bookingDate   DateTime
+  paymentStatus PaymentStatus   @default(PENDING)
+  paymentId     String?
+  pricePaid     Decimal         @db.Decimal(10, 2)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  service       BreedingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([serviceId])
+}
+
+model AnimalProfile {
+  id             String                @id @default(cuid())
+  ownerId        String
+  name           String
+  category       AnimalCategory
+  breed          String
+  ageMonths      Int
+  gender         Gender                @default(MALE)
+  weight         Float?
+  photoUrl       String?
+  healthHistory  String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  owner          User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  medicalRecords MedicalRecord[]
+  vaccinations   VaccinationSchedule[]
+
+  @@index([ownerId])
+}
+
+model VaccinationSchedule {
+  id               String                    @id @default(cuid())
+  animalProfileId  String
+  vaccineName      String
+  dueDate          DateTime
+  administeredDate DateTime?
+  status           VaccinationScheduleStatus @default(SCHEDULED)
+  remindersEnabled Boolean                   @default(true)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  animal           AnimalProfile             @relation(fields: [animalProfileId], references: [id], onDelete: Cascade)
+
+  @@index([animalProfileId])
+}
+
+model MedicalRecord {
+  id              String            @id @default(cuid())
+  animalProfileId String
+  recordType      MedicalRecordType
+  title           String
+  doctorName      String?
+  description     String?
+  fileUrl         String?
+  date            DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  animal          AnimalProfile     @relation(fields: [animalProfileId], references: [id], onDelete: Cascade)
+
+  @@index([animalProfileId])
+}
+
+model CommunityPost {
+  id               String        @id @default(cuid())
+  authorId         String
+  category         String
+  title            String
+  content          String
+  images           String[]
+  videos           String[]
+  isExpertAnswered Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  author           User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments         PostComment[]
+  likes            PostLike[]
+  reports          Report[]      @relation("PostReportRelation")
+
+  @@index([authorId])
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
+}
+
+model PostLike {
+  id        String        @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime      @default(now())
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model PostComment {
+  id        String        @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  parentId  String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   PostComment[] @relation("CommentReplies")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reports   Report[]      @relation("CommentReportRelation")
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model ChatRoom {
+  id           String            @id @default(cuid())
+  type         ChatRoomType      @default(DIRECT)
+  listingId    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  messages     ChatMessage[]
+  participants ChatParticipant[]
+
+  @@index([updatedAt(sort: Desc)])
+}
+
+model ChatParticipant {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  createdAt DateTime @default(now())
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  imageUrl  String?
+  voiceUrl  String?
+  seen      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([createdAt])
+}
+
+model Transaction {
+  id                 String          @id @default(cuid())
+  userId             String
+  amount             Decimal         @db.Decimal(12, 2)
+  type               TransactionType
+  referenceId        String
+  platformCommission Decimal         @default(0.00) @db.Decimal(12, 2)
+  status             PaymentStatus   @default(PENDING)
+  paymentGateway     String
+  paymentId          String?
+  createdAt          DateTime        @default(now())
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+model Report {
+  id          String         @id @default(cuid())
+  reporterId  String
+  type        ReportType
+  targetId    String
+  reason      String
+  description String?
+  status      ReportStatus   @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  listingId   String?
+  postId      String?
+  commentId   String?
+  comment     PostComment?   @relation("CommentReportRelation", fields: [commentId], references: [id])
+  listing     AnimalListing? @relation("ListingReportRelation", fields: [listingId], references: [id])
+  post        CommunityPost? @relation("PostReportRelation", fields: [postId], references: [id])
+  reporter    User           @relation("ReporterRelation", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([status])
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  timeSlot  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  USER
+  SELLER
+  DOCTOR
+  BREEDER
+  VENDOR
+  ADMIN
+}
+
+enum AnimalCategory {
+  COW
+  BUFFALO
+  GOAT
+  DOG
+  CAT
+  HORSE
+  SHEEP
+  RABBIT
+  POULTRY
+  EXOTIC
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum VaccinationStatus {
+  VACCINATED
+  PARTIALLY_VACCINATED
+  NOT_VACCINATED
+}
+
+enum ListingStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  SOLD
+  EXPIRED
+  BLOCKED
+}
+
+enum SubscriptionPlanTier {
+  FREE_TRIAL
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum PromotionType {
+  BANNER
+  TOP_RECOMMENDATION
+  FEATURED_BADGE
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum ConsultationType {
+  ONLINE
+  OFFLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum ProductCategory {
+  MEDICINES
+  DOG_FOOD
+  CAT_FOOD
+  CATTLE_FEED
+  SUPPLEMENTS
+  FARMING_TOOLS
+  VACCINES
+  ACCESSORIES
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum VaccinationScheduleStatus {
+  SCHEDULED
+  ADMINISTERED
+  MISSED
+}
+
+enum MedicalRecordType {
+  PRESCRIPTION
+  LAB_REPORT
+  GENERAL_CHECKUP
+  VACCINATION_CERTIFICATE
+}
+
+enum ChatRoomType {
+  BUYER_SELLER
+  DOCTOR_PATIENT
+  BREEDER_USER
+  DIRECT
+}
+
+enum TransactionType {
+  SUBSCRIPTION
+  AD_PROMOTION
+  PRODUCT_ORDER
+  DOCTOR_BOOKING
+  BREEDER_BOOKING
+}
+
+enum ReportType {
+  LISTING
+  POST
+  COMMENT
+  USER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
